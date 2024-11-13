@@ -1,0 +1,164 @@
+---
+- name: webserver1 server
+  hosts: webserver1
+  become: yes
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - httpd
+          - php
+          - php-cli
+          - php-common
+          - php-curl
+          - php-opcache
+          - php-mysqlnd
+          - nfs-utils
+        state: present
+
+    - name: Create mount directory for web01
+      file:
+        path: /srv/web/web01
+        state: directory
+        mode: '0755'
+
+    - name: Mount NFS share for web01
+      mount:
+        src: 192.168.56.30:/srv/nfs/web01
+        path: /srv/web/web01
+        fstype: nfs
+        opts: "rw,sync"
+        state: mounted
+
+    - name: Ensure NFS share for web01 is mounted on boot
+      mount:
+        src: 192.168.56.30:/srv/nfs/web01
+        path: /srv/web/web01
+        fstype: nfs
+        opts: "rw,sync"
+        state: present
+
+    - name: Create mount directory for wp01
+      file:
+        path: /srv/web/wp01
+        state: directory
+        mode: '0755'
+
+    - name: Mount NFS share for wp01
+      mount:
+        src: 192.168.56.30:/srv/nfs/wp01
+        path: /srv/web/wp01
+        fstype: nfs
+        opts: "rw,sync"
+        state: mounted
+
+    - name: Ensure NFS share for wp01 is mounted on boot
+      mount:
+        src: 192.168.56.30:/srv/nfs/wp01
+        path: /srv/web/wp01
+        fstype: nfs
+        opts: "rw,sync"
+        state: present
+
+    - name: WordPress download
+      get_url:
+        url: https://wordpress.org/latest.tar.gz
+        dest: /srv/web/wp01/latest.tar.gz
+
+    - name: WordPress unarchive
+      unarchive:
+        src: /srv/web/wp01/latest.tar.gz
+        dest: /srv/web/wp01
+        remote_src: yes
+
+    - name: Create phpinfo.php file
+      copy:
+        content: "<?php phpinfo(); ?>"
+        dest: /srv/web/wp01/wordpress/phpinfo.php
+
+    - name: Start and enable httpd service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Deploy web01 vhost configuration
+      template:
+        src: web01.conf.j2
+        dest: /etc/httpd/conf.d/web01.conf
+        mode: '0644'
+      notify:
+        - Restart Apache
+
+    - name: Deploy wp01 vhost configuration
+      template:
+        src: wp01.conf.j2
+        dest: /etc/httpd/conf.d/wp01.conf
+        mode: '0644'
+      notify:
+        - Restart Apache
+
+    - name: Recursively change ownership of a directory
+      file:
+        path: /srv/web
+        state: directory
+        recurse: yes
+        owner: apache
+        group: apache
+        mode: '0755'  
+
+    - name: Create web01 index HTML file
+      template:
+        src: /home/user/ansible_project/web01index_html.j2
+        dest: /srv/web/web01/index.html
+
+    - name: Create wp01 index HTML file
+      template:
+        src: /home/user/ansible_project/wp01index_html.j2
+        dest: /srv/web/wp01/index.html
+
+    - name: Create WordPress config file
+      copy:
+        src: /srv/web/wp01/wordpress/wp-config-sample.php
+        dest: /srv/web/wp01/wordpress/wp-config.php
+        remote_src: yes
+
+    - name: Fix WordPress config
+      replace:
+        path: /srv/web/wp01/wordpress/wp-config.php
+        regexp: "{{ item.src }}"
+        replace: "{{ item.dest }}"
+      loop:
+        - { src: 'database_name_here', dest: 'wpDB' }
+        - { src: 'username_here', dest: 'wpuser' }
+        - { src: 'password_here', dest: '1234' }
+        - { src: 'localhost', dest: '192.168.56.40' }
+
+    - name: Start Firewalld service
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Open firewall ports
+      firewalld:
+        port: "{{ item }}"
+        state: enabled
+        immediate: yes
+        permanent: yes
+      loop:
+        - 80/tcp
+        - 8080/tcp
+
+    - name: Disable SELinux
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+        state: present
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
