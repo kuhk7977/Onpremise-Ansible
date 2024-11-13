@@ -1,0 +1,84 @@
+---
+- name: mariadb server
+  hosts: db_server
+  become: yes
+  tasks:
+    - name: MariaDB Install
+      yum:
+        name:
+          - mariadb-server
+          - python3-PyMySQL
+        state: present
+
+    - name: Modify /etc/my.cnf.d/mariadb-server.cnf
+      lineinfile:
+        path: /etc/my.cnf.d/mariadb-server.cnf
+        search_string: '#bind-address=0.0.0.0'
+        line: bind-address=0.0.0.0
+        state: present
+
+    - name: MariaDB Start
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: Start Firewalld service
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: MySQL firewalld
+      firewalld:
+        port: 3306/tcp
+        state: enabled
+        immediate: yes
+        permanent: yes
+
+    - name: change root passwd
+      shell: mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '1234';"
+
+    - name: MariaDB Restart
+      service:
+        name: mariadb
+        state: restarted
+   
+    - name:
+      mysql_db:
+        login_user: root
+        login_password: 1234
+        name: wpDB
+        state: present
+
+    - name:
+      mysql_user:
+        login_user: root
+        login_password: 1234
+        name: wpuser
+        host: '192.168.56.%'
+        priv: 'wpDB.*:ALL'
+        password: 1234
+        state: present
+
+    - name: Flush privileges
+      mysql_query:
+        login_user: root
+        login_password: 1234
+        query:
+          - DELETE FROM mysql.user WHERE User=''
+          - DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')
+          - FLUSH PRIVILEGES
+
+    - name: Disable SELinux
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+        state: present
+
+  handlers:
+    - name: restart mariadb
+      service:
+        name: mariadb
+        state: restarted
