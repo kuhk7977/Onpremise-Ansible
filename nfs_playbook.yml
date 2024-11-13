@@ -1,0 +1,61 @@
+---
+- name: NFS Server
+  hosts: nfs_server
+  become: yes
+  tasks:
+    - name: Install NFS packages
+      package:
+        name: nfs-utils
+        state: present
+
+    - name: Start and enable NFS server
+      service:
+        name: nfs-server
+        state: started
+        enabled: yes
+
+    - name: Create NFS directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /srv/nfs/web01
+        - /srv/nfs/web02
+        - /srv/nfs/wp01
+
+    - name: Set NFS exports for webserver1
+      lineinfile:
+        path: /etc/exports
+        line: "{{ item }}"
+        insertafter: EOF
+        state: present
+      loop:
+        - "/srv/nfs/web01 192.168.56.21(rw,sync,no_root_squash)"
+        - "/srv/nfs/wp01  192.168.56.21(rw,sync,no_root_squash)"
+      notify:
+        - Restart NFS service
+
+    - name: Set NFS exports for webserver2
+      lineinfile:
+        path: /etc/exports
+        line: "{{ item }}"
+        insertafter: EOF
+        state: present
+      loop:
+        - "/srv/nfs/web02  192.168.56.22(rw,sync,no_root_squash)"
+      notify:
+        - Restart NFS service
+
+    - name: Disable SELinux
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+        state: present
+
+  handlers:
+    - name: Restart NFS service
+      service:
+        name: nfs-server
+        state: restarted
