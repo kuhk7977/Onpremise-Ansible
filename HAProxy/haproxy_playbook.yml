@@ -1,0 +1,59 @@
+---
+- name: Install HAProxy and BIND
+  hosts: haproxy
+  become: yes
+  tasks:
+    - name: Install packages
+      yum:
+        name:
+          - haproxy
+          - bind
+        state: present
+
+    - name: Start and enable BIND
+      systemd:
+        name: named
+        state: started
+        enabled: yes
+
+    - name: Start and enable HAProxy
+      systemd:
+        name: haproxy
+        state: started
+        enabled: yes
+
+    - name: Create /run/haproxy directory
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - /run/haproxy
+
+    - name: Configure HAProxy
+      template:
+        src: haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+      notify: restart haproxy
+
+    - name: Configure Bind
+      template:
+        src: named.conf.j2
+        dest: /etc/named.conf
+      notify: restart BIND
+
+    - name: Configure example.com zone file for BIND
+      template:
+        src: example.com.j2
+        dest: /var/named/example.com
+      notify: restart BIND
+
+  handlers:
+    - name: restart BIND
+      systemd:
+        name: named
+        state: restarted
+
+    - name: restart haproxy
+      systemd:
+        name: haproxy
+        state: restarted
