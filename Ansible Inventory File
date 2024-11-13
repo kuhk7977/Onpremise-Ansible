@@ -1,0 +1,14 @@
+[haproxy]
+10.0.2.11 ansible_ssh_host=192.168.56.11
+
+[webserver1]
+10.0.2.21 ansible_ssh_host=192.168.56.21
+
+[webserver2]
+10.0.2.22 ansible_ssh_host=192.168.56.22
+
+[nfs_server]
+192.168.56.30 ansible_ssh_host=192.168.56.30
+
+[db_server]
+192.168.56.40 ansible_ssh_host=192.168.56.40
