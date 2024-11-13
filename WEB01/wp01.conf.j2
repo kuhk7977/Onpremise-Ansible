@@ -1,0 +1,7 @@
+<VirtualHost *:80>
+    ServerName wordpress.example.com
+    DocumentRoot "/srv/web/wp01/wordpress"
+    <Directory "/srv/web/wp01/wordpress">
+        AllowOverride All
+        Require all granted
+    </Directory>
