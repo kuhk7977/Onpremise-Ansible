@@ -1,0 +1,16 @@
+$TTL 86400
+@   IN  SOA     ns1.example.com. root.example.com. (
+                                2024010101  ; Serial
+                                3600        ; Refresh
+                                1800        ; Retry
+                                1209600     ; Expire
+                                86400 )     ; Minimum TTL
+
+@       IN  NS      ns1.example.com.
+ns1     IN  A       192.168.56.11
+lb01                 IN  A       192.168.56.11
+web01                 IN  A       192.168.56.21
+web02                IN  A       192.168.56.22
+storage01            IN  A       192.168.56.30
+db-server01   IN  A       192.168.56.40
+wordpress   IN  A       192.168.56.21
