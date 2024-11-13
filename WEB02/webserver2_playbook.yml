@@ -1,0 +1,85 @@
+---
+- name: webserver2 setting
+  hosts: webserver2
+  become: yes
+  tasks:
+    - name: Install required packages
+      yum:
+        name:
+          - httpd
+          - mariadb-client 
+          - nfs-utils
+        state: present
+
+    - name: Start and enable httpd service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Create mount directory for web02
+      file:
+        path: /srv/web/web02
+        state: directory
+        mode: '0755'
+
+    - name: Mount NFS share for web02
+      mount:
+        src: 192.168.56.30:/srv/nfs/web02
+        path: /srv/web/web02
+        fstype: nfs
+        opts: "rw,sync"
+        state: mounted
+
+    - name: Ensure NFS share for web02 is mounted on boot
+      mount:
+        src: 192.168.56.30:/srv/nfs/web02
+        path: /srv/web/web02
+        fstype: nfs
+        opts: "rw,sync"
+        state: present
+
+    - name: Deploy web02 vhost configuration
+      template:
+        src: web02.conf.j2
+        dest: /etc/httpd/conf.d/web02.conf
+        mode: '0644'
+      notify:
+        - Restart Apache
+
+    - name: Create web02 index HTML file
+      template:
+        src: /home/user/ansible_project/web02index_html.j2
+        dest: /srv/web/web02/index.html
+
+    - name: Start and enable NFS service
+      service:
+        name: nfs-server
+        state: started
+        enabled: yes
+
+    - name: Start Firewalld service
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Disable SELinux
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+        state: present
+
+    - name: Open firewall port 8080
+      firewalld:
+        port: 8080/tcp
+        state: enabled
+        immediate: yes
+        permanent: yes
+
+  handlers:
+    - name: Restart Apache
+      service:
+        name: httpd
+        state: restarted
